@@ -1,0 +1,136 @@
+---
+title: "Angel Intership"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+  library(bibliometrix)
+  library(igraph)
+  library(tidyverse)
+  library(stringr)
+  library(stringdist)
+  library(readr)
+  library(ggplot2)
+  library(xlsx)
+  library(gplots)
+```
+
+
+Importando datos.
+```{r}
+file <- readFiles("data/Scientometrics.txt")
+df_file <- convert2df(file = file, format = "plaintext",dbsource = "isi" )
+df_file$id_harvest <- row.names(df_file)
+
+authors_1 <- df_file %>% 
+  select(AU, id_harvest)
+
+dummy <-authors_1 %>% separate_rows(AU, sep = ";")
+```
+
+Tablas para artículo.
+```{r}
+py_count <- df_file %>% 
+  count(PY, sort = TRUE) %>% 
+  arrange(PY) %>% 
+  na.omit()
+names(py_count) <- c("Año", "Frecuencia")
+
+au1_count <- dummy %>% 
+  count(AU, sort = TRUE)
+names(au1_count) <- c("Autor", "Frecuencia")
+au1_count <- head(au1_count)
+write.xlsx(au1_count, file = "data/au1_expor.xlsx", 
+           sheetName = "AU populares", append = FALSE)
+
+pi_count <- df_file %>% 
+  count(PI, sort = TRUE)
+names(pi_count) <- c("Ciudad", "Frecuencia")
+pi_count <- head(pi_count)
+write.xlsx(pi_count, file = "data/pi1_expor.xlsx",
+           sheetName = "Ciudades mas productivas", append = FALSE)
+
+so_count <- df_file %>% 
+  count(SO, sort = TRUE)
+so_count <- head(so_count)
+so_count[,3] <- c("Q1", "Q1",NA , NA, "Q2", "Q3")
+so_count[,4] <- c("1.11" , "1.95", NA, NA, "0.27", "0.24")
+so_count[,5] <- c("Computer Science Applications", "Applied Mathematics", NA, NA, "Multidisclipinary", "Computer Science Applications")
+names(so_count) <- c("Fuente", "Documentos", "Cuartil", "Puntuación", "Área de mayor impacto")
+write.xlsx(so_count, file = "data/so1_expor.xlsx",
+           sheetName = "Fuentes mas productivas", append = FALSE)
+
+```
+
+Gráficas para artículo.
+```{r}
+gg_WoS <- ggplot(data = py_count, aes(x=Año,y=Frecuencia))+
+  ggtitle("Producción en Scientometrics, db Wos")+
+  xlab("Año")+ ylab("Frecuencia")+
+  xlim(2000,2020) + ylim(0,30)+
+  geom_point()+
+  geom_line(color='blue4')+
+  geom_smooth(color='red1', size=0.4)
+  
+Sco_Dim <- readFiles("data/db Scopus and Dimensions SCM.csv")
+SD_df <- read_csv2(Sco_Dim)
+SD_df <- SD_df[-1,]                                    #Removiendo fila de año 2000.
+
+gg_Scop <- ggplot(data = SD_df, aes(x=Years,y=SD_df$Scopus))+
+  ggtitle("Producción en Scientometrics, db Scopus")+
+  xlab("Año") + ylab("Frecuencia")+
+  xlim(2000,2020) + ylim(0,50)+
+  geom_point()+
+  geom_line(color='green4')
+  
+gg_Dim <- ggplot(data = SD_df, aes(x=Years,y=SD_df$Dimensions))+
+  ggtitle("Producción en Scientometrics, db Dimensions")+
+  xlab("Año") + ylab("Frecuencia")+
+  xlim(2000,2020) + ylim(0,500)+
+  geom_point()+
+  geom_line()+
+  geom_smooth(size=0.)
+
+
+WSD <- cbind(SD_df, WoS=py_count$Frecuencia)
+
+plotmeans(WSD$WoS~WSD$Years,ylim = c(0,50) , ylab = "Públicaciones", xlab = "Registro en WoS / Scopus", main = "Registro de literatura en Scientometrics" , n.label = FALSE)
+plotmeans(WSD$Scopus~WSD$Years, col ="blue4", n.label = FALSE , add = TRUE)
+plotmeans(WSD$Dimensions~WSD$Years, col ="green4", n.label = FALSE , add = TRUE)
+
+
+ggplot(WSD, aes(x=Years, y=c(WSD$Scopus, WSD$Scopus)))+
+  geom_line()
+
+```
+------------------------------------Inhabilitado a partir de esta linea!!!
+Creando grafo SCM
+```{r}
+g_temp <- graph.data.frame(SCM_temp, directed = FALSE)
+summary(g_temp)
+```
+
+Exportando grafo para visualizar en Gephi
+```{r}
+write.graph(g_temp, "data_graph/Graph Scientometrics_temp.graphml", format = "graphml")
+```
+
+Importano grafo (del archivo perdido es ==)
+```{r}
+graph_Scm <- read_graph("data_graph/Graph Scientometrics.graphml", "graphml")
+
+summary(graph_Scm) 
+```
+
+
+Grado del grafo
+```{r}
+degree_Scm_t <- data.frame(autor = V(g_temp)$name, degree(graph = g_temp))
+
+degree_Scm_t[,3] <- neighborhood.size(graph = g_temp, order = 1,
+                                    nodes = V(g_temp), mode = c("all"))
+
+```
+Angel Flores
